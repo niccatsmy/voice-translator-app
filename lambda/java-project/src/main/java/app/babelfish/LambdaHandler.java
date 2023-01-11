@@ -68,7 +68,7 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		String fileName = "output/" + new Date().getTime() + ".mp3";
 		
 		PutObjectRequest request = new PutObjectRequest(bucket, fileName, new File(outputFile));
-		request.setCannedAcl(CannedAccessControlList.PublicRead);
+		// request.setCannedAcl(CannedAccessControlList.PublicRead);
 		s3.putObject(request);
 		
 		return fileName;
