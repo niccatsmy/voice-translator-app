@@ -2,15 +2,22 @@ package app.babelfish;
 
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.io.IOException;
 import java.util.Date;
+import java.nio.charset.StandardCharsets;
 
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 
 import com.amazonaws.services.translate.AmazonTranslate;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.AWSLambda;
+import com.amazonaws.services.lambda.AWSLambdaClientBuilder;
+import com.amazonaws.services.lambda.model.InvokeRequest;
+import com.amazonaws.services.lambda.model.InvokeResult;
 import com.amazonaws.services.polly.AmazonPolly;
 import com.amazonaws.services.polly.AmazonPollyClientBuilder;
 import com.amazonaws.services.polly.model.OutputFormat;
@@ -36,6 +43,7 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 	AmazonS3 s3 = AmazonS3ClientBuilder.standard().build();
 	AmazonTranslate translate = AmazonTranslateClient.builder().build();
     AmazonPolly polly = AmazonPollyClientBuilder.defaultClient();
+	AWSLambda lambda = AWSLambdaClientBuilder.defaultClient();
     
     
 	@Override
@@ -48,27 +56,47 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		logger.log("Source Language: " + name.getSourceLanguage());
 		logger.log("Target: " + name.getTargetLanguage());
 		
-		//Converting Audio to Text using Amazon Transcribe service.
+		// Converting Audio to Text using Amazon Transcribe service.
         String transcript = transcribe(logger, name.getBucket(), name.getKey(), name.getSourceLanguage());
 
-        //Translating text from one language to another using Amazon Translate service.
-        String translatedText = translate(logger, transcript, name.getSourceLanguage(), name.getTargetLanguage());
-        
-        //Converting text to Audio using Amazon Polly service.
-        String outputFile = synthesize(logger, translatedText, name.getTargetLanguage());
-        
-        //Saving output file on S3.
-        String fileName = saveOnS3(name.getBucket(), outputFile);
+		// Create temporary file as input for comprehend
+		String outputFileName = "/tmp/output.txt";
+
+		try {
+			File outputFile = new File("/tmp/output.txt"); 
+			FileWriter writer = new FileWriter(outputFile);
+			writer.write(transcript);
+			writer.close();
+			System.out.println("Wrote content to file");
+		} catch (Exception e) {
+			System.out.println("Unable to write out file");
+		}
+
+		// Getting sentiment score from Amazon Comprehend service
+		InvokeRequest invokeRequest = new InvokeRequest();
+		invokeRequest.setFunctionName("sentimentAnalysis");
+		InvokeResult sentiment = lambda.invoke(invokeRequest);
+
+		String ans = new String(sentiment.getPayload().array(), StandardCharsets.UTF_8);
+
+		System.out.println(ans);
+
+		//Translating text from one language to another using Amazon Translate service.
+		String translatedText = translate(logger, transcript, name.getSourceLanguage(), name.getTargetLanguage());
+		
+		
+		// Save file to s3 bucket
+
+        // String fileName = saveOnS3(name.getBucket(), outputFileName);
     	
-		return fileName;
+		return transcript;
 	}
 	
 	private String saveOnS3(String bucket, String outputFile) {
-		
-		String fileName = "output/" + new Date().getTime() + ".mp3";
+
+		String fileName = "output/" + new Date().getTime() + ".txt";
 		
 		PutObjectRequest request = new PutObjectRequest(bucket, fileName, new File(outputFile));
-		// request.setCannedAcl(CannedAccessControlList.PublicRead);
 		s3.putObject(request);
 		
 		return fileName;
@@ -106,9 +134,8 @@ public class LambdaHandler implements RequestHandler<Input, String> {
         logger.log("Transcript: " + transcript);
  
         return transcript;
-	}
-	
-	private String translate(LambdaLogger logger, String text, String sourceLanguage, String targetLanguage) {
+
+	}	private String translate(LambdaLogger logger, String text, String sourceLanguage, String targetLanguage) {
 		
 		if (targetLanguage.equals("ca")) {
 			targetLanguage = "fr";
@@ -130,80 +157,6 @@ public class LambdaHandler implements RequestHandler<Input, String> {
         return translatedText;
 		
 	}
-	
-    private String synthesize(LambdaLogger logger, String text, String language) {
-    	
-    	VoiceId voiceId = null;
-
-    	if (language.equals("en") ) {
-    		voiceId = VoiceId.Matthew;
-    	} 
-    	
-    	if (language.equals("pl") ) {
-    		voiceId = VoiceId.Maja;
-    	} 
-    	
-    	if (language.equals("es") ) {
-    		voiceId = VoiceId.Miguel;
-    	} 
-    	
-    	if (language.equals("fr") ) {
-    		voiceId = VoiceId.Mathieu;
-    	} 
-    	
-    	if (language.equals("ja") ) {
-    		voiceId = VoiceId.Takumi;
-    	} 
-    	
-    	if (language.equals("ru") ) {
-    		voiceId = VoiceId.Maxim;
-    	} 
-    	
-    	if (language.equals("de") ) {
-    		voiceId = VoiceId.Hans;
-    	} 
-    	
-    	if (language.equals("it") ) {
-    		voiceId = VoiceId.Giorgio;
-    	} 
-    	
-    	if (language.equals("sv") ) {
-    		voiceId = VoiceId.Astrid;
-    	} 
-    	
-    	if (language.equals("gb") ) {
-    		voiceId = VoiceId.Brian;
-    	} 
-    	
-    	if (language.equals("ca") ) {
-    		voiceId = VoiceId.Chantal;
-    	} 
-
-    	
-        String outputFileName = "/tmp/output.mp3";
- 
-        SynthesizeSpeechRequest synthesizeSpeechRequest = new SynthesizeSpeechRequest()
-                .withOutputFormat(OutputFormat.Mp3)
-                .withVoiceId(voiceId)
-                .withText(text);
- 
-        try (FileOutputStream outputStream = new FileOutputStream(new File(outputFileName))) {
-            SynthesizeSpeechResult synthesizeSpeechResult = polly.synthesizeSpeech(synthesizeSpeechRequest);
-            byte[] buffer = new byte[2 * 1024];
-            int readBytes;
- 
-            try (InputStream in = synthesizeSpeechResult.getAudioStream()){
-                while ((readBytes = in.read(buffer)) > 0) {
-                    outputStream.write(buffer, 0, readBytes);
-                }
-            }
-            
-        } catch (Exception e) {
-        	logger.log(e.toString());
-        }
-        
-        return outputFileName;
-    }
 }
 
 class Input {
