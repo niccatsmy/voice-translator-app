@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.283.1.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/css/voice-translator.css">
+    <link href="https://fonts.googleapis.com/css?family=Allerta+Stencil" rel="stylesheet">
+  </head>
+  <body>
+    <div class="app">
+
+      <div class="app">
+        <br/><img src="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/graphics/logo.png" height="80">
+      </div>
+
+      <div class="app">
+        Select Source Language<br/><br/>
+        <div id="wrapper">
+          <div class="flags"><img id="source_en" class='clickableimage' src="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/graphics/flags/en2.png" height="100" onclick="babel_unselect_source(); babel_select('source','en');"><br/>US <br/>English</div>
+          <div class="flags"><img id="source_es" class='clickableimage' src="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/graphics/flags/es.png" height="100" onclick="babel_unselect_source(); babel_select('source','es');"><br/>US </br>Spanish</div>
+          <br/><br/>
+        </div>
+      </div>
+
+      <div class="app">
+        Sentiment Analysis<br/><br/>
+        <div id="wrapper">
+          <div class="content-box">
+          </head>
+            <body>
+              <h1>
+                <div id="sentiment-output"><block></block> </div>
+              </h1>
+            </body>
+          </div>
+      </div>
+
+      <br/><br/><br/>
+
+      <div class="app">
+        <div id="babel_button">
+          <img id="start_button" class='clickableimage' src="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/graphics/start.png" height="50" onclick="babel_start();">
+          <img id="stop_button" src="https://s3.amazonaws.com/tomash-us-east-1/voice-translator/graphics/stop2.png" height="50" onclick="babel_stop();">
+        </div>
+      </div>
+
+      <span id="processing">Processing...</span>
+    </div>
+    <script src="https://cdn.rawgit.com/mattdiamond/Recorderjs/08e7abd9/dist/recorder.js"></script>
+    <script src="voice-translator-config.js"></script>
+    <script src="voice-translator.js"></script>
+  </body>
+</html>

@@ -55,7 +55,6 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		logger.log("Bucket: " + name.getBucket());
 		logger.log("Key: " + name.getKey());
 		logger.log("Source Language: " + name.getSourceLanguage());
-		logger.log("Target: " + name.getTargetLanguage());
 		
 		// Converting Audio to Text using Amazon Transcribe service.
         String transcript = transcribe(logger, name.getBucket(), name.getKey(), name.getSourceLanguage());
@@ -68,17 +67,15 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 			FileWriter writer = new FileWriter(outputFile);
 			writer.write(transcript);
 			writer.close();
-			System.out.println("Wrote content to file");
+			System.out.println("Wrote transcription content to file");
 		} catch (Exception e) {
 			System.out.println("Unable to write out file");
 		}
 
 		// create event payload
 		JSONObject eventPayload = new JSONObject();
-		
 		eventPayload.put("transcribed-content", transcript);
 		eventPayload.put("language-code", name.getSourceLanguage());
-
 		String message = eventPayload.toString();
 
 		System.out.println(message);
@@ -89,27 +86,11 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		invokeRequest.setPayload(message);
 ;
 		InvokeResult sentiment = lambda.invoke(invokeRequest);
-
-
 		String sentimentResponse = new String(sentiment.getPayload().array(), StandardCharsets.UTF_8);
 
 		System.out.println("The resulting sentiment is: " + sentimentResponse);
 
-		//Translating text from one language to another using Amazon Translate service.
-		String translatedText = translate(logger, transcript, name.getSourceLanguage(), name.getTargetLanguage());
-
-		String translatedOutputFileName = "/tmp/translated-output.txt";
 		String sentimentOutputFileName = "/tmp/sentiment-output.txt";
-
-		try {
-			File translatedOutputFile = new File("/tmp/translated-output.txt"); 
-			FileWriter writer = new FileWriter(translatedOutputFile);
-			writer.write(translatedText);
-			writer.close();
-			System.out.println("Wrote translated content to file");
-		} catch (Exception e) {
-			System.out.println("Unable to write out file");
-		}
 
 		try {
 			File sentimentOutputFile = new File("/tmp/sentiment-output.txt"); 
@@ -122,18 +103,15 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		}
 
 		// Save file to s3 bucket
-        String fileName = saveOnS3(name.getBucket(), translatedOutputFileName, sentimentOutputFileName);
+        String fileName = saveOnS3(name.getBucket(), sentimentOutputFileName);
     	
-		return transcript;
+		return sentimentResponse;
 	}
 	
-	private String saveOnS3(String bucket, String translatedOutputFile, String sentimentOutputFile) {
+	private String saveOnS3(String bucket, String sentimentOutputFile) {
 
-		Long dateTime = new Date().getTime();
-		String date = Long.toString(dateTime);
-
-		String translatedFileName = "output/" + date + "-translation.txt";
-		String sentimentFileName = "output/" + date + ".txt";
+		// String translatedFileName = "output/" + date + "-translation.txt";
+		String sentimentFileName = "output/" + new Date().getTime() + ".txt";
 
 		// PutObjectRequest translatedRequest = new PutObjectRequest(bucket, translatedFileName, new File(translatedOutputFile));
 		PutObjectRequest sentimentRequest = new PutObjectRequest(bucket, sentimentFileName, new File(sentimentOutputFile));
@@ -177,35 +155,13 @@ public class LambdaHandler implements RequestHandler<Input, String> {
  
         return transcript;
 
-	}	private String translate(LambdaLogger logger, String text, String sourceLanguage, String targetLanguage) {
-		
-		if (targetLanguage.equals("ca")) {
-			targetLanguage = "fr";
-		}
-		
-		if (targetLanguage.equals("gb")) {
-			targetLanguage = "en";
-		}
-		
-		TranslateTextRequest request = new TranslateTextRequest().withText(text)
-                .withSourceLanguageCode(sourceLanguage)
-                .withTargetLanguageCode(targetLanguage);
-        TranslateTextResult result  = translate.translateText(request);
-        
-        String translatedText = result.getTranslatedText();
-        
-        logger.log("Translation: " + translatedText);
-        
-        return translatedText;
-		
-	}
+	}	
 }
 
 class Input {
 	private String bucket;
 	private String key;
 	private String sourceLanguage;
-	private String targetLanguage;
 	public String getBucket() {
 		return bucket;
 	}
@@ -224,15 +180,6 @@ class Input {
 	public void setSourceLanguage(String sourceLanguage) {
 		this.sourceLanguage = sourceLanguage;
 	}
-	public String getTargetLanguage() {
-		return targetLanguage;
-	}
-	public void setTargetLanguage(String targetLanguage) {
-		this.targetLanguage = targetLanguage;
-	}
-	
-	
-	
-	
-	
 }
+
+	
