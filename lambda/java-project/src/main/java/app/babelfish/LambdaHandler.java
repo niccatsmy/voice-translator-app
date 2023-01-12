@@ -8,6 +8,7 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;  
 
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
 
@@ -72,22 +73,44 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 			System.out.println("Unable to write out file");
 		}
 
+		// create event payload
+		JSONObject eventPayload = new JSONObject();
+		
+		eventPayload.put("transcribed-content", transcript);
+
+		String message = eventPayload.toString();
+
+		System.out.println(message);
+
 		// Getting sentiment score from Amazon Comprehend service
 		InvokeRequest invokeRequest = new InvokeRequest();
 		invokeRequest.setFunctionName("sentimentAnalysis");
+		invokeRequest.setPayload(message);
+;
 		InvokeResult sentiment = lambda.invoke(invokeRequest);
 
-		String ans = new String(sentiment.getPayload().array(), StandardCharsets.UTF_8);
 
-		System.out.println(ans);
+		String sentimentResponse = new String(sentiment.getPayload().array(), StandardCharsets.UTF_8);
+
+		System.out.println(sentimentResponse);
 
 		//Translating text from one language to another using Amazon Translate service.
 		String translatedText = translate(logger, transcript, name.getSourceLanguage(), name.getTargetLanguage());
-		
+
+		String translatedOutputFileName = "/tmp/translated-output.txt";
+
+		try {
+			File translatedOutputFile = new File("/tmp/translated-output.txt"); 
+			FileWriter writer = new FileWriter(translatedOutputFile);
+			writer.write(transcript);
+			writer.close();
+			System.out.println("Wrote content to file");
+		} catch (Exception e) {
+			System.out.println("Unable to write out file");
+		}
 		
 		// Save file to s3 bucket
-
-        // String fileName = saveOnS3(name.getBucket(), outputFileName);
+        String fileName = saveOnS3(name.getBucket(), translatedOutputFileName);
     	
 		return transcript;
 	}
