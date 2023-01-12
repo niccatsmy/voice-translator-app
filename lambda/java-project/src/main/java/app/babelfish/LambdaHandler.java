@@ -77,6 +77,7 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 		JSONObject eventPayload = new JSONObject();
 		
 		eventPayload.put("transcribed-content", transcript);
+		eventPayload.put("language-code", name.getSourceLanguage());
 
 		String message = eventPayload.toString();
 
@@ -92,37 +93,55 @@ public class LambdaHandler implements RequestHandler<Input, String> {
 
 		String sentimentResponse = new String(sentiment.getPayload().array(), StandardCharsets.UTF_8);
 
-		System.out.println(sentimentResponse);
+		System.out.println("The resulting sentiment is: " + sentimentResponse);
 
 		//Translating text from one language to another using Amazon Translate service.
 		String translatedText = translate(logger, transcript, name.getSourceLanguage(), name.getTargetLanguage());
 
 		String translatedOutputFileName = "/tmp/translated-output.txt";
+		String sentimentOutputFileName = "/tmp/sentiment-output.txt";
 
 		try {
 			File translatedOutputFile = new File("/tmp/translated-output.txt"); 
 			FileWriter writer = new FileWriter(translatedOutputFile);
-			writer.write(transcript);
+			writer.write(translatedText);
 			writer.close();
-			System.out.println("Wrote content to file");
+			System.out.println("Wrote translated content to file");
 		} catch (Exception e) {
 			System.out.println("Unable to write out file");
 		}
-		
+
+		try {
+			File sentimentOutputFile = new File("/tmp/sentiment-output.txt"); 
+			FileWriter writer = new FileWriter(sentimentOutputFile);
+			writer.write(sentimentResponse);
+			writer.close();
+			System.out.println("Wrote sentiment content to file");
+		} catch (Exception e) {
+			System.out.println("Unable to write out file");
+		}
+
 		// Save file to s3 bucket
-        String fileName = saveOnS3(name.getBucket(), translatedOutputFileName);
+        String fileName = saveOnS3(name.getBucket(), translatedOutputFileName, sentimentOutputFileName);
     	
 		return transcript;
 	}
 	
-	private String saveOnS3(String bucket, String outputFile) {
+	private String saveOnS3(String bucket, String translatedOutputFile, String sentimentOutputFile) {
 
-		String fileName = "output/" + new Date().getTime() + ".txt";
+		Long dateTime = new Date().getTime();
+		String date = Long.toString(dateTime);
+
+		String translatedFileName = "output/" + date + "-translation.txt";
+		String sentimentFileName = "output/" + date + ".txt";
+
+		// PutObjectRequest translatedRequest = new PutObjectRequest(bucket, translatedFileName, new File(translatedOutputFile));
+		PutObjectRequest sentimentRequest = new PutObjectRequest(bucket, sentimentFileName, new File(sentimentOutputFile));
 		
-		PutObjectRequest request = new PutObjectRequest(bucket, fileName, new File(outputFile));
-		s3.putObject(request);
+		// s3.putObject(translatedRequest);
+		s3.putObject(sentimentRequest);
 		
-		return fileName;
+		return sentimentFileName;
 		
 	}
 
